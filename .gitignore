@@ -1,0 +1,78 @@
+# =============================================================================
+# SEGURANÇA & DADOS SENSÍVEIS (NUNCA SUBIR PARA REPOSITÓRIO PÚBLICO)
+# =============================================================================
+.env
+.env.*
+!.env.example
+*.env
+*.local
+*.secrets
+*.secret
+*.token
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+*credentials*
+*private_key*
+
+# =============================================================================
+# DEPENDÊNCIAS & COMPILADOS
+# =============================================================================
+node_modules/
+/dist
+/tmp
+/out-tsc
+/bazel-out
+/.angular/cache
+
+# =============================================================================
+# LOGS & DIAGNÓSTICOS
+# =============================================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+testem.log
+/libpeerconnection.log
+
+# =============================================================================
+# COBERTURA DE TESTES & RELATÓRIOS
+# =============================================================================
+/coverage
+/.nyc_output
+/reports
+
+# =============================================================================
+# IDES, EDITORES & SISTEMA OPERACIONAL
+# =============================================================================
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+*.swp
+*.swo
+*~
+
+# Sistema Operacional (macOS, Windows, Linux)
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
