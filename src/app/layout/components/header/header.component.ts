@@ -2,6 +2,7 @@ import { Component, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { BusinessService } from '../../../core/services/business.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-header',
@@ -50,17 +51,26 @@ import { BusinessService } from '../../../core/services/business.service';
         <!-- Divider -->
         <div class="h-6 w-px bg-slate-200"></div>
 
-        <!-- User Profile Pill -->
+        <!-- User Profile Pill & Logout -->
         <div class="flex items-center gap-2.5 pl-1">
           <img
-            [src]="business().logoUrl"
+            [src]="currentUser()?.avatarUrl || business().logoUrl"
             alt="Foto do perfil"
             class="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-100 border border-slate-200"
           />
           <div class="hidden md:block text-left">
-            <div class="text-xs font-bold text-slate-800 leading-tight">Administrador</div>
-            <div class="text-[10px] text-slate-400 font-medium">Gestor da Unidade</div>
+            <div class="text-xs font-bold text-slate-800 leading-tight">{{ currentUser()?.name || 'Administrador' }}</div>
+            <div class="text-[10px] text-slate-400 font-medium">{{ currentUser()?.role === 'ADMIN' ? 'Gestor da Unidade' : 'Profissional' }}</div>
           </div>
+
+          <!-- Logout button -->
+          <button
+            (click)="onLogout()"
+            title="Sair do Sistema"
+            class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors ml-1"
+          >
+            <i class="pi pi-sign-out text-sm"></i>
+          </button>
         </div>
       </div>
     </header>
@@ -71,9 +81,16 @@ export class HeaderComponent {
 
   private router = inject(Router);
   private businessService = inject(BusinessService);
+  private authService = inject(AuthService);
+
   public business = this.businessService.business;
+  public currentUser = this.authService.currentUser;
 
   onNewAppointment(): void {
     this.router.navigate(['/admin/schedule'], { queryParams: { action: 'new' } });
+  }
+
+  onLogout(): void {
+    this.authService.logout();
   }
 }

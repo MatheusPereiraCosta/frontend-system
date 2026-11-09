@@ -8,6 +8,11 @@ export const routes: Routes = [
     pathMatch: 'full'
   },
   {
+    path: 'login',
+    loadComponent: () =>
+      import('./features/auth/login/login.component').then(m => m.LoginComponent)
+  },
+  {
     path: 'admin',
     component: MainLayoutComponent,
     children: [
@@ -55,6 +60,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'admin/dashboard'
+    redirectTo: 'login'
   }
 ];
