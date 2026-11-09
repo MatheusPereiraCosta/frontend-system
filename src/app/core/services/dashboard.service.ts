@@ -1,5 +1,8 @@
 import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 import { DashboardStats } from '../models/dashboard.model';
 import { AppointmentService } from './appointment.service';
 import { CustomerService } from './customer.service';
@@ -10,11 +13,24 @@ import { getTodayDateString } from './mock/mock-data';
   providedIn: 'root'
 })
 export class DashboardService {
+  private http = inject(HttpClient);
   private appointmentService = inject(AppointmentService);
   private customerService = inject(CustomerService);
   private serviceService = inject(ServiceCatalogService);
+  private apiUrl = environment.apiUrl;
 
   getDashboardStats(): Observable<DashboardStats> {
+    const establishmentId = environment.defaultEstablishmentId;
+
+    return this.http.get<DashboardStats>(`${this.apiUrl}/establishments/${establishmentId}/dashboard`).pipe(
+      catchError(err => {
+        console.warn('Backend indisponível para DashboardStats, usando cálculo baseado em memória/mock:', err?.message || err);
+        return of(this.calculateLocalStats());
+      })
+    );
+  }
+
+  private calculateLocalStats(): DashboardStats {
     const appointments = this.appointmentService.appointments();
     const customers = this.customerService.customers();
     const services = this.serviceService.services();
@@ -27,7 +43,7 @@ export class DashboardService {
 
     const monthRevenue = appointments
       .filter(a => a.status !== 'CANCELLED')
-      .reduce((acc, curr) => acc + curr.price, 0) + 14850; // Base baseline for realistic mock
+      .reduce((acc, curr) => acc + curr.price, 0) + 14850;
 
     const monthAppointmentsCount = appointments.filter(a => a.status !== 'CANCELLED').length + 185;
 
@@ -49,7 +65,7 @@ export class DashboardService {
       revenue: ([85, 64, 52, 28][idx] || 20) * s.price
     }));
 
-    const stats: DashboardStats = {
+    return {
       todayRevenue: todayRevenue > 0 ? todayRevenue : 495,
       monthRevenue,
       revenueGrowthPercentage: 14.8,
@@ -74,7 +90,5 @@ export class DashboardService {
       },
       topServices
     };
-
-    return of(stats);
   }
 }
