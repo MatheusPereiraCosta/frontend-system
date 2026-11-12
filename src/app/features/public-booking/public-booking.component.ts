@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 
 import { BusinessService } from '../../core/services/business.service';
 import { ServiceCatalogService } from '../../core/services/service-catalog.service';
@@ -13,8 +13,7 @@ import { Professional } from '../../core/models/professional.model';
 import { Appointment } from '../../core/models/appointment.model';
 import { CurrencyBrlPipe } from '../../shared/pipes/currency-brl.pipe';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
-import { PhonePipe } from '../../shared/pipes/phone.pipe';
-import { getTodayDateString, getDateOffsetString } from '../../core/services/mock/mock-data';
+import { apiErrorMessage } from '../../core/services/api-mappers';
 
 @Component({
   selector: 'app-public-booking',
@@ -28,11 +27,24 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
     DurationPipe
   ],
   template: `
-    <div class="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+    <!-- Carregando -->
+    <div *ngIf="loading" class="min-h-screen bg-slate-900 text-slate-400 flex items-center justify-center text-sm">
+      <i class="pi pi-spin pi-spinner mr-2"></i>Carregando...
+    </div>
+
+    <!-- Estabelecimento não encontrado ou erro ao carregar -->
+    <div *ngIf="!loading && loadError" class="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center text-center px-4">
+      <h1 class="text-2xl font-black text-white">{{ notFound ? 'Estabelecimento não encontrado' : 'Não foi possível carregar' }}</h1>
+      <p class="text-sm text-slate-400 mt-2 max-w-sm">{{ loadError }}</p>
+      <a routerLink="/" class="mt-6 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold">Buscar estabelecimentos</a>
+    </div>
+
+    <div *ngIf="!loading && !loadError" class="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
       <!-- Top banner & Establishment Header -->
       <header class="relative">
-        <div class="h-44 sm:h-56 w-full relative overflow-hidden">
+        <div class="h-44 sm:h-56 w-full relative overflow-hidden bg-gradient-to-br from-indigo-900 to-slate-900">
           <img
+            *ngIf="business.bannerUrl"
             [src]="business.bannerUrl"
             [alt]="business.name"
             class="w-full h-full object-cover opacity-40 scale-105 filter blur-xs"
@@ -43,30 +55,36 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
         <div class="max-w-3xl mx-auto px-4 -mt-20 relative z-10">
           <div class="bg-slate-800/90 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-slate-700/80 shadow-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left">
             <img
+              *ngIf="business.logoUrl; else logoFallback"
               [src]="business.logoUrl"
               [alt]="business.name"
               class="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover ring-4 ring-indigo-500/30 border-2 border-slate-700 shadow-lg"
             />
+            <ng-template #logoFallback>
+              <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-indigo-600/30 ring-4 ring-indigo-500/30 border-2 border-slate-700 flex items-center justify-center text-3xl font-black text-indigo-200">
+                {{ business.name.charAt(0).toUpperCase() }}
+              </div>
+            </ng-template>
             <div class="flex-1">
               <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                 <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   {{ business.category | uppercase }}
                 </span>
-                <span class="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                <span *ngIf="business.totalReviews > 0" class="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
                   <i class="pi pi-star-fill text-[10px]"></i>
                   {{ business.rating }} ({{ business.totalReviews }} avaliações)
                 </span>
               </div>
 
               <h1 class="text-xl sm:text-2xl font-black text-white mt-2 tracking-tight">{{ business.name }}</h1>
-              <p class="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">{{ business.tagline }}</p>
+              <p *ngIf="business.tagline" class="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">{{ business.tagline }}</p>
 
               <div class="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-xs text-slate-400 mt-3 pt-3 border-t border-slate-700/60">
-                <span class="flex items-center gap-1.5">
+                <span *ngIf="addressText" class="flex items-center gap-1.5">
                   <i class="pi pi-map-marker text-indigo-400 text-xs"></i>
-                  {{ business.address.street }}, {{ business.address.number }} - {{ business.address.city }}/{{ business.address.state }}
+                  {{ addressText }}
                 </span>
-                <span class="flex items-center gap-1.5">
+                <span *ngIf="business.whatsapp" class="flex items-center gap-1.5">
                   <i class="pi pi-whatsapp text-emerald-400 text-xs"></i>
                   {{ business.whatsapp }}
                 </span>
@@ -101,6 +119,10 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
               <h2 class="text-lg font-bold text-white">Escolha o serviço desejado</h2>
               <p class="text-xs text-slate-400">Toque no serviço para prosseguir com o agendamento</p>
             </div>
+          </div>
+
+          <div *ngIf="activeServices.length === 0" class="p-6 bg-slate-800/60 rounded-2xl border border-slate-700 text-center text-xs text-slate-400">
+            Este estabelecimento ainda não disponibilizou serviços para agendamento online.
           </div>
 
           <div class="grid grid-cols-1 gap-3">
@@ -148,6 +170,10 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
             </div>
           </div>
 
+          <div *ngIf="availableProfessionals.length === 0" class="p-6 bg-slate-800/60 rounded-2xl border border-slate-700 text-center text-xs text-slate-400">
+            Nenhum profissional atende este serviço no momento. Escolha outro serviço.
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div
               *ngFor="let pro of availableProfessionals"
@@ -156,19 +182,21 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
               class="p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-4 group"
             >
               <img
+                *ngIf="pro.avatarUrl; else proFallback"
                 [src]="pro.avatarUrl"
                 [alt]="pro.name"
                 class="w-14 h-14 rounded-2xl object-cover border border-slate-700"
               />
+              <ng-template #proFallback>
+                <div class="w-14 h-14 rounded-2xl bg-indigo-600/30 border border-slate-700 flex items-center justify-center text-lg font-black text-indigo-200">
+                  {{ pro.name.charAt(0).toUpperCase() }}
+                </div>
+              </ng-template>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between">
                   <h3 class="font-bold text-white text-sm group-hover:text-indigo-300 transition-colors truncate">{{ pro.name }}</h3>
-                  <span class="text-xs text-amber-400 font-bold flex items-center gap-1">
-                    <i class="pi pi-star-fill text-[10px]"></i>
-                    {{ pro.rating }}
-                  </span>
                 </div>
-                <p class="text-xs text-slate-400 mt-0.5 truncate">{{ pro.role }}</p>
+                <p *ngIf="pro.role" class="text-xs text-slate-400 mt-0.5 truncate">{{ pro.role }}</p>
                 <div class="mt-2 text-xs text-indigo-400 font-medium">Selecionar</div>
               </div>
             </div>
@@ -208,7 +236,8 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
           <!-- Time Slots Grid -->
           <div>
             <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Horários Disponíveis</label>
-            <div *ngIf="availableSlots.length > 0" class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <div *ngIf="loadingSlots" class="text-xs text-slate-400"><i class="pi pi-spin pi-spinner mr-2"></i>Buscando horários...</div>
+            <div *ngIf="!loadingSlots && availableSlots.length > 0" class="grid grid-cols-3 sm:grid-cols-6 gap-2">
               <button
                 *ngFor="let slot of availableSlots"
                 type="button"
@@ -220,7 +249,7 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
               </button>
             </div>
 
-            <div *ngIf="availableSlots.length === 0" class="p-6 bg-slate-800/60 rounded-2xl border border-slate-700 text-center text-xs text-slate-400">
+            <div *ngIf="!loadingSlots && availableSlots.length === 0" class="p-6 bg-slate-800/60 rounded-2xl border border-slate-700 text-center text-xs text-slate-400">
               Não encontramos horários livres para este dia com o profissional selecionado. Por favor, escolha outra data.
             </div>
           </div>
@@ -238,7 +267,7 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
                 <input
                   type="text"
                   formControlName="name"
-                  placeholder="Ex: Gabriel Martins"
+                  placeholder="Ex: Maria Souza"
                   class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -259,21 +288,23 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
               <input
                 type="text"
                 formControlName="notes"
-                placeholder="Ex: Primeira vez no estabelecimento"
+                placeholder="Ex: Primeira vez por aqui"
                 class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </form>
 
+          <div *ngIf="bookingError" class="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl">{{ bookingError }}</div>
+
           <!-- Submit Button -->
           <div class="pt-2">
             <button
               (click)="confirmBooking()"
-              [disabled]="clientForm.invalid || !selectedTime"
+              [disabled]="clientForm.invalid || !selectedTime || submitting"
               class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white text-base font-bold rounded-2xl shadow-lg shadow-emerald-900/40 transition-all flex items-center justify-center gap-2"
             >
-              <i class="pi pi-check text-lg"></i>
-              <span>Confirmar Agendamento</span>
+              <i class="pi text-lg" [ngClass]="submitting ? 'pi-spin pi-spinner' : 'pi-check'"></i>
+              <span>{{ submitting ? 'Agendando...' : 'Confirmar Agendamento' }}</span>
             </button>
           </div>
         </div>
@@ -288,7 +319,7 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
             <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Agendamento Confirmado!</span>
             <h2 class="text-2xl font-black text-white mt-1">Tudo pronto para o seu atendimento</h2>
             <p class="text-xs text-slate-300 mt-2">
-              Enviamos um resumo dos detalhes para o WhatsApp <strong class="text-white">{{ confirmedAppointment.customerPhone }}</strong>.
+              Guarde os detalhes abaixo. Se precisar remarcar, entre em contato com o estabelecimento{{ business.whatsapp ? ' pelo WhatsApp ' + business.whatsapp : '' }}.
             </p>
           </div>
 
@@ -306,9 +337,9 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
               <span class="text-slate-400">Data e Horário:</span>
               <span class="font-bold text-indigo-400 font-mono">{{ confirmedAppointment.date }} às {{ confirmedAppointment.startTime }}</span>
             </div>
-            <div class="flex justify-between py-1 border-b border-slate-800">
+            <div *ngIf="addressText" class="flex justify-between gap-4 py-1 border-b border-slate-800">
               <span class="text-slate-400">Local:</span>
-              <span class="font-medium text-slate-200">{{ business.address.street }}, {{ business.address.number }}</span>
+              <span class="font-medium text-slate-200 text-right">{{ addressText }}</span>
             </div>
             <div class="flex justify-between py-1 pt-2 text-base font-extrabold">
               <span class="text-slate-300">Valor a pagar no local:</span>
@@ -323,26 +354,20 @@ import { getTodayDateString, getDateOffsetString } from '../../core/services/moc
             >
               Fazer Novo Agendamento
             </button>
-
-            <a
-              routerLink="/admin/dashboard"
-              class="block text-xs text-slate-400 hover:text-white transition-colors"
-            >
-              Voltar ao Painel Administrativo
-            </a>
           </div>
         </div>
       </main>
 
       <!-- Footer -->
       <footer class="py-6 border-t border-slate-800 text-center text-xs text-slate-400">
-        <p>© 2026 {{ business.name }} — Plataforma de Agendamentos desenvolvida com AgendaPro</p>
+        <p>{{ business.name }} — agendamentos com <a routerLink="/" class="hover:text-white">AgendaPro</a></p>
       </footer>
     </div>
   `
 })
 export class PublicBookingComponent implements OnInit {
   private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
   private businessService = inject(BusinessService);
   private serviceService = inject(ServiceCatalogService);
   private professionalService = inject(ProfessionalService);
@@ -352,10 +377,17 @@ export class PublicBookingComponent implements OnInit {
   public activeServices: ServiceItem[] = [];
   public availableProfessionals: Professional[] = [];
 
+  public loading = true;
+  public loadError: string | null = null;
+  public notFound = false;
+  public loadingSlots = false;
+  public submitting = false;
+  public bookingError: string | null = null;
+
   public currentStep = 1;
   public selectedService: ServiceItem | null = null;
   public selectedProfessional: Professional | null = null;
-  public selectedDate: string = getTodayDateString();
+  public selectedDate: string = this.toDateString(new Date());
   public selectedTime: string | null = null;
   public availableSlots: string[] = [];
 
@@ -369,16 +401,42 @@ export class PublicBookingComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.business = this.businessService.business();
     this.generateNextDays();
 
-    this.serviceService.getActiveServices().subscribe((list: ServiceItem[]) => {
-      this.activeServices = list;
+    const slug = this.route.snapshot.paramMap.get('slug') ?? '';
+    this.businessService.getBusinessBySlug(slug).subscribe({
+      next: business => {
+        this.business = business;
+        this.serviceService.getActiveServices(business.id).subscribe({
+          next: list => {
+            this.activeServices = list;
+            this.loading = false;
+          },
+          error: err => this.failLoading(err)
+        });
+      },
+      error: err => this.failLoading(err)
     });
+  }
 
-    this.professionalService.getActiveProfessionals().subscribe((list: Professional[]) => {
-      this.availableProfessionals = list;
-    });
+  private failLoading(err: any): void {
+    this.notFound = err?.status === 404;
+    this.loadError = this.notFound
+      ? 'Confira o endereço digitado ou busque o estabelecimento pelo nome.'
+      : apiErrorMessage(err, 'Tente novamente em instantes.');
+    this.loading = false;
+  }
+
+  /** Endereço em uma linha, só com o que foi preenchido. */
+  get addressText(): string {
+    const a = this.business.address;
+    const streetLine = [a.street, a.number].filter(Boolean).join(', ');
+    const cityLine = [a.city, a.state].filter(Boolean).join('/');
+    return [streetLine, a.neighborhood, cityLine].filter(Boolean).join(' - ');
+  }
+
+  private toDateString(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   generateNextDays(): void {
@@ -389,15 +447,12 @@ export class PublicBookingComponent implements OnInit {
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() + i);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${day}`;
+      const dateStr = this.toDateString(d);
 
       this.nextDays.push({
         dateStr,
         weekday: i === 0 ? 'Hoje' : weekdays[d.getDay()],
-        dayNum: day,
+        dayNum: dateStr.substring(8, 10),
         monthShort: months[d.getMonth()]
       });
     }
@@ -405,7 +460,14 @@ export class PublicBookingComponent implements OnInit {
 
   selectService(srv: ServiceItem): void {
     this.selectedService = srv;
+    this.selectedProfessional = null;
+    this.availableProfessionals = [];
     this.currentStep = 2;
+    // Só os profissionais que realizam o serviço escolhido
+    this.professionalService.getProfessionalsByService(srv.id, this.business.id).subscribe({
+      next: list => (this.availableProfessionals = list.filter(p => p.active !== false)),
+      error: () => (this.availableProfessionals = [])
+    });
   }
 
   selectProfessional(pro: Professional): void {
@@ -414,25 +476,36 @@ export class PublicBookingComponent implements OnInit {
     this.onSelectDate(this.selectedDate);
   }
 
-  onSelectDate(dateStr: string): void {
+  onSelectDate(dateStr: string, keepError = false): void {
     this.selectedDate = dateStr;
     this.selectedTime = null;
+    this.availableSlots = [];
+    if (!keepError) this.bookingError = null;
     if (this.selectedProfessional && this.selectedService) {
+      this.loadingSlots = true;
       this.appointmentService.getAvailableSlots(
         this.selectedProfessional.id,
         this.selectedDate,
-        this.selectedService.durationMinutes
-      ).subscribe((slots: string[]) => {
-        this.availableSlots = slots;
-        if (slots.length > 0) {
-          this.selectedTime = slots[0];
+        this.selectedService.durationMinutes,
+        this.selectedService.id,
+        this.business.id
+      ).subscribe({
+        next: (slots: string[]) => {
+          // Ignora respostas de um dia que já não está selecionado
+          if (dateStr !== this.selectedDate) return;
+          this.availableSlots = slots;
+          this.loadingSlots = false;
+        },
+        error: () => {
+          this.availableSlots = [];
+          this.loadingSlots = false;
         }
       });
     }
   }
 
   confirmBooking(): void {
-    if (this.clientForm.invalid || !this.selectedService || !this.selectedProfessional || !this.selectedTime) {
+    if (this.clientForm.invalid || this.submitting || !this.selectedService || !this.selectedProfessional || !this.selectedTime) {
       return;
     }
 
@@ -443,9 +516,11 @@ export class PublicBookingComponent implements OnInit {
     const endTime = `${endH}:${endM}`;
 
     const formVal = this.clientForm.value;
+    this.submitting = true;
+    this.bookingError = null;
 
     this.appointmentService.createAppointment({
-      customerId: `cli-web-${Date.now()}`,
+      customerId: '',
       customerName: formVal.name,
       customerPhone: formVal.phone,
       professionalId: this.selectedProfessional.id,
@@ -460,13 +535,17 @@ export class PublicBookingComponent implements OnInit {
       status: 'CONFIRMED',
       notes: formVal.notes || 'Agendado online',
       isPublicBooking: true
-    }).subscribe({
+    }, this.business.id).subscribe({
       next: (apt: Appointment) => {
+        this.submitting = false;
         this.confirmedAppointment = apt;
         this.currentStep = 4;
       },
       error: (err: Error) => {
-        alert(err.message || 'Erro ao realizar o agendamento.');
+        this.submitting = false;
+        this.bookingError = err.message || 'Erro ao realizar o agendamento.';
+        // O horário pode ter sido ocupado por outra pessoa: atualiza a lista
+        this.onSelectDate(this.selectedDate, true);
       }
     });
   }
@@ -477,6 +556,7 @@ export class PublicBookingComponent implements OnInit {
     this.selectedProfessional = null;
     this.selectedTime = null;
     this.confirmedAppointment = null;
+    this.bookingError = null;
     this.clientForm.reset();
   }
 }

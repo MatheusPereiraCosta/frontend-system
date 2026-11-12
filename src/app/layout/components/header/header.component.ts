@@ -21,7 +21,7 @@ import { AuthService } from '../../../core/services/auth.service';
         </button>
 
         <div class="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-medium">
-          <span class="text-slate-500 font-semibold">{{ business().name }}</span>
+          <span class="text-slate-500 font-semibold">{{ business().name || 'AgendaPro' }}</span>
           <i class="pi pi-chevron-right text-[10px] text-slate-300"></i>
           <span class="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-semibold">Painel de Controle</span>
         </div>
@@ -31,6 +31,7 @@ import { AuthService } from '../../../core/services/auth.service';
       <div class="flex items-center gap-2 sm:gap-4">
         <!-- New Appointment Action -->
         <button
+          *ngIf="business().id"
           (click)="onNewAppointment()"
           class="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm shadow-indigo-600/30 transition-all active:scale-95"
         >
@@ -39,28 +40,17 @@ import { AuthService } from '../../../core/services/auth.service';
           <span class="sm:hidden">Agendar</span>
         </button>
 
-        <!-- Notification Bell (Static / Mock) -->
-        <button
-          class="relative p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
-          title="Notificações"
-        >
-          <i class="pi pi-bell text-base"></i>
-          <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white animate-pulse"></span>
-        </button>
-
         <!-- Divider -->
         <div class="h-6 w-px bg-slate-200"></div>
 
         <!-- User Profile Pill & Logout -->
         <div class="flex items-center gap-2.5 pl-1">
-          <img
-            [src]="currentUser()?.avatarUrl || business().logoUrl"
-            alt="Foto do perfil"
-            class="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-100 border border-slate-200"
-          />
+          <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 ring-2 ring-indigo-100 flex items-center justify-center text-xs font-bold">
+            {{ (currentUser()?.name || '?').charAt(0).toUpperCase() }}
+          </div>
           <div class="hidden md:block text-left">
-            <div class="text-xs font-bold text-slate-800 leading-tight">{{ currentUser()?.name || 'Administrador' }}</div>
-            <div class="text-[10px] text-slate-400 font-medium">{{ currentUser()?.role === 'ADMIN' ? 'Gestor da Unidade' : 'Profissional' }}</div>
+            <div class="text-xs font-bold text-slate-800 leading-tight">{{ currentUser()?.name }}</div>
+            <div class="text-[10px] text-slate-400 font-medium">{{ currentUser()?.role === 'ADMIN' ? 'Administrador' : 'Profissional' }}</div>
           </div>
 
           <!-- Logout button -->

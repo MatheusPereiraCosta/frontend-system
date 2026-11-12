@@ -82,11 +82,9 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
                 <!-- Name & Avatar -->
                 <td class="py-4 px-6">
                   <div class="flex items-center gap-3">
-                    <img
-                      [src]="customer.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'"
-                      [alt]="customer.name"
-                      class="w-10 h-10 rounded-full object-cover border border-slate-200"
-                    />
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
+                      {{ customer.name.charAt(0).toUpperCase() }}
+                    </div>
                     <div>
                       <div class="font-bold text-slate-900">{{ customer.name }}</div>
                       <div class="text-xs text-slate-400">Cliente desde {{ customer.createdAt }}</div>

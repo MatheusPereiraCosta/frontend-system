@@ -18,7 +18,6 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 import { CurrencyBrlPipe } from '../../shared/pipes/currency-brl.pipe';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { PhonePipe } from '../../shared/pipes/phone.pipe';
-import { getTodayDateString } from '../../core/services/mock/mock-data';
 
 @Component({
   selector: 'app-schedule',
@@ -107,10 +106,16 @@ import { getTodayDateString } from '../../core/services/mock/mock-data';
           <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <img
+                *ngIf="pro.avatarUrl; else proInitial"
                 [src]="pro.avatarUrl"
                 [alt]="pro.name"
                 class="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-xs"
               />
+              <ng-template #proInitial>
+                <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 ring-2 ring-white flex items-center justify-center text-sm font-bold">
+                  {{ pro.name.charAt(0).toUpperCase() }}
+                </div>
+              </ng-template>
               <div>
                 <h3 class="text-sm font-bold text-slate-900">{{ pro.name }}</h3>
                 <p class="text-xs text-slate-500">{{ pro.role }}</p>
@@ -191,6 +196,7 @@ import { getTodayDateString } from '../../core/services/mock/mock-data';
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Profissional *</label>
             <select
               formControlName="professionalId"
+              (change)="refreshSlots()"
               class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             >
               <option value="" disabled>Selecione um profissional</option>
@@ -220,7 +226,7 @@ import { getTodayDateString } from '../../core/services/mock/mock-data';
               <input
                 type="text"
                 formControlName="customerName"
-                placeholder="Ex: Carlos Silva"
+                placeholder="Ex: Maria Souza"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               />
             </div>
@@ -242,6 +248,7 @@ import { getTodayDateString } from '../../core/services/mock/mock-data';
               <input
                 type="date"
                 formControlName="date"
+                (change)="refreshSlots()"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               />
             </div>
@@ -251,6 +258,7 @@ import { getTodayDateString } from '../../core/services/mock/mock-data';
                 formControlName="startTime"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white font-mono"
               >
+                <option value="" disabled>{{ loadingSlots ? 'Buscando...' : (timeSlots.length ? 'Selecione' : 'Sem horários livres') }}</option>
                 <option *ngFor="let slot of timeSlots" [value]="slot">{{ slot }}</option>
               </select>
             </div>
@@ -278,7 +286,7 @@ import { getTodayDateString } from '../../core/services/mock/mock-data';
             </button>
             <button
               type="submit"
-              [disabled]="appointmentForm.invalid"
+              [disabled]="appointmentForm.invalid || saving"
               class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold shadow-sm transition-all"
             >
               Confirmar Agendamento
@@ -381,7 +389,7 @@ export class ScheduleComponent implements OnInit {
   private serviceService = inject(ServiceCatalogService);
   private customerService = inject(CustomerService);
 
-  public selectedDate: string = getTodayDateString();
+  public selectedDate: string = this.todayString();
   public selectedProfessionalFilter = 'ALL';
 
   public professionals: Professional[] = [];
@@ -393,11 +401,11 @@ export class ScheduleComponent implements OnInit {
   public showDetailsModal = false;
   public selectedAppointment: Appointment | null = null;
   public errorMessage: string | null = null;
+  public saving = false;
+  public loadingSlots = false;
 
-  public timeSlots: string[] = [
-    '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00'
-  ];
+  /** Horários livres reais (vindos da API) para o profissional, serviço e data escolhidos. */
+  public timeSlots: string[] = [];
 
   public appointmentForm: FormGroup = this.fb.group({
     professionalId: ['', Validators.required],
@@ -405,9 +413,14 @@ export class ScheduleComponent implements OnInit {
     customerName: ['', Validators.required],
     customerPhone: ['', Validators.required],
     date: [this.selectedDate, Validators.required],
-    startTime: ['09:00', Validators.required],
+    startTime: ['', Validators.required],
     notes: ['']
   });
+
+  private todayString(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
 
   get formattedSelectedDate(): string {
     const [year, month, day] = this.selectedDate.split('-').map(Number);
@@ -441,9 +454,38 @@ export class ScheduleComponent implements OnInit {
       this.services = srvList;
     });
 
-    this.appointmentService.getAppointments().subscribe((aptList: Appointment[]) => {
+    this.loadAppointments();
+  }
+
+  /** A API devolve só os agendamentos do dia consultado. */
+  loadAppointments(): void {
+    const date = this.selectedDate;
+    this.appointmentService.getAppointmentsByDate(date).subscribe((aptList: Appointment[]) => {
+      if (date !== this.selectedDate) return; // o usuário já mudou de dia
       this.appointments = aptList;
-      this.filterAppointments();
+    });
+  }
+
+  refreshSlots(): void {
+    const { professionalId, serviceId, date } = this.appointmentForm.value;
+    this.appointmentForm.patchValue({ startTime: '' });
+    this.timeSlots = [];
+    const srv = this.services.find(s => s.id === serviceId);
+    if (!professionalId || !srv || !date) return;
+
+    this.loadingSlots = true;
+    this.appointmentService.getAvailableSlots(professionalId, date, srv.durationMinutes, srv.id).subscribe({
+      next: slots => {
+        // Descarta resposta de uma escolha que já mudou
+        const cur = this.appointmentForm.value;
+        if (cur.professionalId !== professionalId || cur.serviceId !== serviceId || cur.date !== date) return;
+        this.timeSlots = slots;
+        this.loadingSlots = false;
+      },
+      error: () => {
+        this.timeSlots = [];
+        this.loadingSlots = false;
+      }
     });
   }
 
@@ -471,11 +513,13 @@ export class ScheduleComponent implements OnInit {
     const d = String(dateObj.getDate()).padStart(2, '0');
     this.selectedDate = `${y}-${m}-${d}`;
     this.appointmentForm.patchValue({ date: this.selectedDate });
+    this.loadAppointments();
   }
 
   goToToday(): void {
-    this.selectedDate = getTodayDateString();
+    this.selectedDate = this.todayString();
     this.appointmentForm.patchValue({ date: this.selectedDate });
+    this.loadAppointments();
   }
 
   openNewAppointmentModal(proId?: string): void {
@@ -486,18 +530,19 @@ export class ScheduleComponent implements OnInit {
       customerName: '',
       customerPhone: '',
       date: this.selectedDate,
-      startTime: '09:00',
+      startTime: '',
       notes: ''
     });
     this.showNewModal = true;
+    this.refreshSlots();
   }
 
   onServiceChange(): void {
-    // Optional helper when service changes
+    this.refreshSlots();
   }
 
   saveAppointment(): void {
-    if (this.appointmentForm.invalid) return;
+    if (this.appointmentForm.invalid || this.saving) return;
 
     this.errorMessage = null;
     const formVal = this.appointmentForm.value;
@@ -513,8 +558,9 @@ export class ScheduleComponent implements OnInit {
     const endM = String(totalMinutes % 60).padStart(2, '0');
     const endTime = `${endH}:${endM}`;
 
+    this.saving = true;
     this.appointmentService.createAppointment({
-      customerId: `cli-guest-${Date.now()}`,
+      customerId: '',
       customerName: formVal.customerName,
       customerPhone: formVal.customerPhone,
       professionalId: pro.id,
@@ -530,11 +576,16 @@ export class ScheduleComponent implements OnInit {
       notes: formVal.notes
     }).subscribe({
       next: () => {
+        this.saving = false;
         this.showNewModal = false;
-        this.loadData();
+        // Mostra o dia do agendamento criado
+        this.selectedDate = formVal.date;
+        this.loadAppointments();
       },
       error: (err: Error) => {
+        this.saving = false;
         this.errorMessage = err.message || 'Erro ao criar agendamento.';
+        this.refreshSlots();
       }
     });
   }
@@ -550,7 +601,7 @@ export class ScheduleComponent implements OnInit {
     this.appointmentService.updateStatus(this.selectedAppointment.id, status).subscribe((updated: Appointment | null) => {
       if (updated) {
         this.selectedAppointment = updated;
-        this.loadData();
+        this.loadAppointments();
       }
     });
   }

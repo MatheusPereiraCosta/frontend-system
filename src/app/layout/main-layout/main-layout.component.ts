@@ -1,6 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { BusinessService } from '../../core/services/business.service';
+import { AppointmentService } from '../../core/services/appointment.service';
+import { AuthService } from '../../core/services/auth.service';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';
 import { HeaderComponent } from '../components/header/header.component';
 
@@ -38,6 +41,19 @@ import { HeaderComponent } from '../components/header/header.component';
     </div>
   `
 })
-export class MainLayoutComponent {
+export class MainLayoutComponent implements OnInit {
+  private businessService = inject(BusinessService);
+  private appointmentService = inject(AppointmentService);
+  private authService = inject(AuthService);
+
   isSidebarOpen = false;
+
+  ngOnInit(): void {
+    // O nome e o endereço público do estabelecimento aparecem na barra lateral e no cabeçalho
+    this.businessService.loadMine().subscribe();
+    // Alimenta o contador de agendamentos de hoje da barra lateral
+    if (this.authService.establishmentId()) {
+      this.appointmentService.getAppointments().subscribe();
+    }
+  }
 }

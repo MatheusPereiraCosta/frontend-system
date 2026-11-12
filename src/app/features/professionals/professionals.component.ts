@@ -4,7 +4,8 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { DialogModule } from 'primeng/dialog';
 import { ProfessionalService } from '../../core/services/professional.service';
 import { ServiceCatalogService } from '../../core/services/service-catalog.service';
-import { Professional } from '../../core/models/professional.model';
+import { Professional, WorkingHour } from '../../core/models/professional.model';
+import { apiErrorMessage } from '../../core/services/api-mappers';
 import { ServiceItem } from '../../core/models/service.model';
 import { PhonePipe } from '../../shared/pipes/phone.pipe';
 
@@ -45,17 +46,19 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
             <!-- Header of card -->
             <div class="flex items-start gap-4">
               <img
+                *ngIf="pro.avatarUrl; else noAvatar"
                 [src]="pro.avatarUrl"
                 [alt]="pro.name"
                 class="w-14 h-14 rounded-2xl object-cover ring-2 ring-indigo-50 border border-slate-200 shadow-xs"
               />
+              <ng-template #noAvatar>
+                <div class="w-14 h-14 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-black">
+                  {{ pro.name.charAt(0).toUpperCase() }}
+                </div>
+              </ng-template>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between">
                   <h3 class="text-base font-bold text-slate-900 truncate">{{ pro.name }}</h3>
-                  <span class="inline-flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                    <i class="pi pi-star-fill text-[10px]"></i>
-                    {{ pro.rating }}
-                  </span>
                 </div>
                 <p class="text-xs text-indigo-600 font-semibold mt-0.5">{{ pro.role }}</p>
                 <p class="text-xs text-slate-400 font-mono mt-1">{{ pro.phone | phoneFormat }}</p>
@@ -126,7 +129,7 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
             <input
               type="text"
               formControlName="name"
-              placeholder="Ex: Carlos Mendes"
+              placeholder="Ex: Ana Souza"
               class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             />
           </div>
@@ -137,7 +140,7 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
               <input
                 type="text"
                 formControlName="role"
-                placeholder="Ex: Master Barber, Barbeiro Fade"
+                placeholder="Ex: Cabeleireira, Dentista, Personal"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               />
             </div>
@@ -158,16 +161,16 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
               <input
                 type="email"
                 formControlName="email"
-                placeholder="pro@agendapro.com"
+                placeholder="profissional@exemplo.com"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               />
             </div>
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">URL do Avatar</label>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Link da foto (opcional)</label>
               <input
                 type="text"
                 formControlName="avatarUrl"
-                placeholder="https://images.unsplash.com/..."
+                placeholder="https://..."
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
               />
             </div>
@@ -178,10 +181,44 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
             <textarea
               formControlName="bio"
               rows="3"
-              placeholder="Descreva a experiência, prêmios e estilo do profissional..."
+              placeholder="Descreva a experiência e as especialidades do profissional..."
               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             ></textarea>
           </div>
+
+          <!-- Serviços que o profissional realiza -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Serviços que realiza *</label>
+            <p *ngIf="availableServices.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              Cadastre pelo menos um serviço em "Serviços & Preços" para vincular ao profissional.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              <label *ngFor="let s of availableServices" class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input type="checkbox" [checked]="selectedServiceIds.has(s.id)" (change)="toggleService(s.id)" class="w-4 h-4 rounded" />
+                <span class="truncate">{{ s.name }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Horários de atendimento -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Horários de atendimento</label>
+            <div class="space-y-1.5">
+              <div *ngFor="let wh of workingHours" class="grid grid-cols-12 items-center gap-2 text-sm">
+                <label class="col-span-5 flex items-center gap-2 cursor-pointer text-slate-700">
+                  <input type="checkbox" [checked]="wh.enabled" (change)="wh.enabled = !wh.enabled" class="w-4 h-4 rounded" />
+                  <span>{{ wh.dayName }}</span>
+                </label>
+                <input type="time" [value]="wh.startTime" (change)="wh.startTime = $any($event.target).value" [disabled]="!wh.enabled"
+                  class="col-span-3 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs disabled:opacity-40" />
+                <span class="col-span-1 text-center text-slate-400 text-xs">às</span>
+                <input type="time" [value]="wh.endTime" (change)="wh.endTime = $any($event.target).value" [disabled]="!wh.enabled"
+                  class="col-span-3 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs disabled:opacity-40" />
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="errorMessage" class="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">{{ errorMessage }}</div>
 
           <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
@@ -193,7 +230,7 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
             </button>
             <button
               type="submit"
-              [disabled]="proForm.invalid"
+              [disabled]="proForm.invalid || selectedServiceIds.size === 0 || saving"
               class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold shadow-sm transition-all"
             >
               Salvar Profissional
@@ -214,15 +251,35 @@ export class ProfessionalsComponent implements OnInit {
 
   public showModal = false;
   public editingId: string | null = null;
+  public saving = false;
+  public errorMessage: string | null = null;
+  public selectedServiceIds = new Set<string>();
+  public workingHours: WorkingHour[] = this.defaultWorkingHours();
 
   public proForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
     role: ['', Validators.required],
     email: [''],
     phone: ['', Validators.required],
-    avatarUrl: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'],
+    avatarUrl: [''],
     bio: ['']
   });
+
+  /** Segunda a sexta, 09:00–18:00; sábado e domingo de folga. O dono ajusta no formulário. */
+  private defaultWorkingHours(): WorkingHour[] {
+    const days: Array<[number, string]> = [
+      [1, 'Segunda-feira'], [2, 'Terça-feira'], [3, 'Quarta-feira'], [4, 'Quinta-feira'],
+      [5, 'Sexta-feira'], [6, 'Sábado'], [0, 'Domingo']
+    ];
+    return days.map(([dayOfWeek, dayName]) => ({
+      dayOfWeek, dayName, enabled: dayOfWeek >= 1 && dayOfWeek <= 5, startTime: '09:00', endTime: '18:00'
+    }));
+  }
+
+  toggleService(id: string): void {
+    if (this.selectedServiceIds.has(id)) this.selectedServiceIds.delete(id);
+    else this.selectedServiceIds.add(id);
+  }
 
   ngOnInit(): void {
     this.loadData();
@@ -245,6 +302,7 @@ export class ProfessionalsComponent implements OnInit {
   }
 
   openModal(pro?: Professional): void {
+    this.errorMessage = null;
     if (pro) {
       this.editingId = pro.id;
       this.proForm.patchValue({
@@ -255,47 +313,56 @@ export class ProfessionalsComponent implements OnInit {
         avatarUrl: pro.avatarUrl,
         bio: pro.bio
       });
+      this.selectedServiceIds = new Set(pro.serviceIds ?? []);
+      // Mantém a ordem segunda → domingo e completa dias que não vieram da API
+      const defaults = this.defaultWorkingHours();
+      this.workingHours = defaults.map(d => {
+        const saved = pro.workingHours?.find(h => h.dayOfWeek === d.dayOfWeek);
+        return saved ? { ...d, ...saved, dayName: d.dayName, startTime: saved.startTime.substring(0, 5), endTime: saved.endTime.substring(0, 5) } : { ...d, enabled: false };
+      });
     } else {
       this.editingId = null;
-      this.proForm.reset({
-        name: '',
-        role: 'Barbeiro Especialista',
-        email: '',
-        phone: '',
-        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-        bio: ''
-      });
+      this.proForm.reset({ name: '', role: '', email: '', phone: '', avatarUrl: '', bio: '' });
+      this.selectedServiceIds = new Set();
+      this.workingHours = this.defaultWorkingHours();
     }
     this.showModal = true;
   }
 
   saveProfessional(): void {
-    if (this.proForm.invalid) return;
+    if (this.proForm.invalid || this.selectedServiceIds.size === 0 || this.saving) return;
+
+    const invalidDay = this.workingHours.find(h => h.enabled && (!h.startTime || !h.endTime || h.startTime >= h.endTime));
+    if (invalidDay) {
+      this.errorMessage = `Confira o horário de ${invalidDay.dayName}: o início precisa ser antes do término.`;
+      return;
+    }
 
     const val = this.proForm.value;
-    if (this.editingId) {
-      this.professionalService.updateProfessional(this.editingId, val).subscribe(() => {
+    const payload = {
+      ...val,
+      email: val.email || null,
+      avatarUrl: val.avatarUrl || null,
+      serviceIds: Array.from(this.selectedServiceIds),
+      workingHours: this.workingHours
+    };
+
+    this.saving = true;
+    this.errorMessage = null;
+    const request$ = this.editingId
+      ? this.professionalService.updateProfessional(this.editingId, payload)
+      : this.professionalService.addProfessional({ ...payload, active: true });
+
+    request$.subscribe({
+      next: () => {
+        this.saving = false;
         this.showModal = false;
         this.loadData();
-      });
-    } else {
-      this.professionalService.addProfessional({
-        ...val,
-        active: true,
-        serviceIds: this.availableServices.slice(0, 3).map(s => s.id),
-        workingHours: [
-          { dayOfWeek: 1, dayName: 'Segunda-feira', enabled: true, startTime: '09:00', endTime: '19:00' },
-          { dayOfWeek: 2, dayName: 'Terça-feira', enabled: true, startTime: '09:00', endTime: '19:00' },
-          { dayOfWeek: 3, dayName: 'Quarta-feira', enabled: true, startTime: '09:00', endTime: '19:00' },
-          { dayOfWeek: 4, dayName: 'Quinta-feira', enabled: true, startTime: '09:00', endTime: '20:00' },
-          { dayOfWeek: 5, dayName: 'Sexta-feira', enabled: true, startTime: '09:00', endTime: '20:00' },
-          { dayOfWeek: 6, dayName: 'Sábado', enabled: true, startTime: '08:30', endTime: '18:00' },
-          { dayOfWeek: 0, dayName: 'Domingo', enabled: false, startTime: '09:00', endTime: '14:00' }
-        ]
-      }).subscribe(() => {
-        this.showModal = false;
-        this.loadData();
-      });
-    }
+      },
+      error: err => {
+        this.saving = false;
+        this.errorMessage = apiErrorMessage(err, 'Não foi possível salvar o profissional.');
+      }
+    });
   }
 }

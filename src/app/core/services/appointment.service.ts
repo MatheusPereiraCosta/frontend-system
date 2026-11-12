@@ -4,7 +4,10 @@ import { Observable, of, throwError } from 'rxjs';
 import { catchError, tap, map } from 'rxjs/operators';
 import { Appointment, AppointmentStatus } from '../models/appointment.model';
 import { INITIAL_APPOINTMENTS, getTodayDateString } from './mock/mock-data';
+import { MOCK_ENABLED, fallbackTo, initialData } from './mock/mock-fallback';
 import { environment } from '../../../environments/environment';
+import { AuthService } from './auth.service';
+import { appointmentFromApi, apiErrorMessage } from './api-mappers';
 
 interface AvailabilityResponse {
   date: string;
@@ -16,7 +19,13 @@ interface AvailabilityResponse {
 })
 export class AppointmentService {
   private http = inject(HttpClient);
-  private appointmentsSignal = signal<Appointment[]>(INITIAL_APPOINTMENTS);
+  private auth = inject(AuthService);
+
+  private currentEstablishmentId(): string {
+    return this.auth.establishmentId() ?? '';
+  }
+
+  private appointmentsSignal = signal<Appointment[]>(initialData(INITIAL_APPOINTMENTS));
   public appointments = this.appointmentsSignal.asReadonly();
 
   public todayAppointments = computed(() => {
@@ -24,29 +33,32 @@ export class AppointmentService {
     return this.appointmentsSignal().filter(a => a.date === today);
   });
 
-  getAppointments(establishmentId: string = environment.defaultEstablishmentId, date?: string): Observable<Appointment[]> {
+  getAppointments(establishmentId: string = this.currentEstablishmentId(), date?: string): Observable<Appointment[]> {
     let url = `${environment.apiUrl}/establishments/${establishmentId}/appointments`;
     if (date) url += `?date=${date}`;
 
-    return this.http.get<Appointment[]>(url).pipe(
+    return this.http.get<any[]>(url).pipe(
+      map(list => list.map(appointmentFromApi)),
       tap(list => this.appointmentsSignal.set(list)),
-      catchError(() => of(this.appointmentsSignal()))
+      catchError(fallbackTo(() => of(this.appointmentsSignal())))
     );
   }
 
-  getAppointmentsByDate(date: string, establishmentId: string = environment.defaultEstablishmentId): Observable<Appointment[]> {
-    return this.http.get<Appointment[]>(`${environment.apiUrl}/establishments/${establishmentId}/appointments?date=${date}`).pipe(
-      catchError(() => of(this.appointmentsSignal().filter(a => a.date === date)))
+  getAppointmentsByDate(date: string, establishmentId: string = this.currentEstablishmentId()): Observable<Appointment[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/establishments/${establishmentId}/appointments?date=${date}`).pipe(
+      map(list => list.map(appointmentFromApi)),
+      catchError(fallbackTo(() => of(this.appointmentsSignal().filter(a => a.date === date))))
     );
   }
 
-  getAppointmentsByDateRange(startDate: string, endDate: string, establishmentId: string = environment.defaultEstablishmentId): Observable<Appointment[]> {
-    return this.http.get<Appointment[]>(`${environment.apiUrl}/establishments/${establishmentId}/appointments?startDate=${startDate}&endDate=${endDate}`).pipe(
-      catchError(() => of(this.appointmentsSignal().filter(a => a.date >= startDate && a.date <= endDate)))
+  getAppointmentsByDateRange(startDate: string, endDate: string, establishmentId: string = this.currentEstablishmentId()): Observable<Appointment[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/establishments/${establishmentId}/appointments?startDate=${startDate}&endDate=${endDate}`).pipe(
+      map(list => list.map(appointmentFromApi)),
+      catchError(fallbackTo(() => of(this.appointmentsSignal().filter(a => a.date >= startDate && a.date <= endDate))))
     );
   }
 
-  createAppointment(appointment: Omit<Appointment, 'id' | 'createdAt'>, establishmentId: string = environment.defaultEstablishmentId): Observable<Appointment> {
+  createAppointment(appointment: Omit<Appointment, 'id' | 'createdAt'>, establishmentId: string = this.currentEstablishmentId()): Observable<Appointment> {
     const payload = {
       professionalId: appointment.professionalId,
       serviceId: appointment.serviceId,
@@ -59,15 +71,20 @@ export class AppointmentService {
       isPublicBooking: appointment.isPublicBooking || false
     };
 
-    return this.http.post<Appointment>(`${environment.apiUrl}/establishments/${establishmentId}/appointments`, payload).pipe(
+    return this.http.post<any>(`${environment.apiUrl}/establishments/${establishmentId}/appointments`, payload).pipe(
+      map(appointmentFromApi),
       tap(created => this.appointmentsSignal.update(list => [created, ...list])),
       catchError((error) => {
-        // Se a API retornou erro específico (ex: 409 Conflict), repassa a mensagem
-        if (error.status === 409 || error.error?.detail) {
-          return throwError(() => new Error(error.error?.detail || 'Horário indisponível! Já existe um agendamento conflitante.'));
+        // Erros de regra de negócio da API (409 conflito, 400 horário inválido, 404 etc.) trazem a mensagem pronta
+        if (error.error?.detail || error.error?.fields) {
+          return throwError(() => new Error(apiErrorMessage(error, 'Não foi possível salvar o agendamento.')));
         }
 
-        // Fallback local se o servidor estiver offline
+        if (!MOCK_ENABLED) {
+          return throwError(() => new Error('Não foi possível salvar o agendamento. Verifique a conexão com o servidor e tente novamente.'));
+        }
+
+        // Fallback local se o servidor estiver offline (somente com useMockFallback = true)
         const hasConflict = this.appointmentsSignal().some(a =>
           a.professionalId === appointment.professionalId &&
           a.date === appointment.date &&
@@ -93,12 +110,13 @@ export class AppointmentService {
     );
   }
 
-  updateStatus(id: string, status: AppointmentStatus, establishmentId: string = environment.defaultEstablishmentId): Observable<Appointment | null> {
-    return this.http.patch<Appointment>(`${environment.apiUrl}/establishments/${establishmentId}/appointments/${id}/status`, { status }).pipe(
+  updateStatus(id: string, status: AppointmentStatus, establishmentId: string = this.currentEstablishmentId()): Observable<Appointment | null> {
+    return this.http.patch<any>(`${environment.apiUrl}/establishments/${establishmentId}/appointments/${id}/status`, { status }).pipe(
+      map(appointmentFromApi),
       tap(saved => {
         this.appointmentsSignal.update(list => list.map(a => a.id === id ? saved : a));
       }),
-      catchError(() => {
+      catchError(fallbackTo(() => {
         let updated: Appointment | null = null;
         this.appointmentsSignal.update(list =>
           list.map(a => {
@@ -110,18 +128,18 @@ export class AppointmentService {
           })
         );
         return of(updated);
-      })
+      }))
     );
   }
 
-  deleteAppointment(id: string, establishmentId: string = environment.defaultEstablishmentId): Observable<boolean> {
+  deleteAppointment(id: string, establishmentId: string = this.currentEstablishmentId()): Observable<boolean> {
     return this.http.delete<void>(`${environment.apiUrl}/establishments/${establishmentId}/appointments/${id}`).pipe(
       map(() => true),
       tap(() => this.appointmentsSignal.update(list => list.filter(a => a.id !== id))),
-      catchError(() => {
+      catchError(fallbackTo(() => {
         this.appointmentsSignal.update(list => list.filter(a => a.id !== id));
         return of(true);
-      })
+      }))
     );
   }
 
@@ -130,17 +148,17 @@ export class AppointmentService {
     date: string,
     durationMinutes: number,
     serviceId?: string,
-    establishmentId: string = environment.defaultEstablishmentId
+    establishmentId: string = this.currentEstablishmentId()
   ): Observable<string[]> {
     if (serviceId) {
       return this.http.get<AvailabilityResponse>(
         `${environment.apiUrl}/establishments/${establishmentId}/availability?professionalId=${professionalId}&serviceId=${serviceId}&date=${date}`
       ).pipe(
         map(res => res.availableTimes),
-        catchError(() => this.getMockSlots(professionalId, date, durationMinutes))
+        catchError(fallbackTo(() => this.getMockSlots(professionalId, date, durationMinutes)))
       );
     }
-    return this.getMockSlots(professionalId, date, durationMinutes);
+    return MOCK_ENABLED ? this.getMockSlots(professionalId, date, durationMinutes) : of([]);
   }
 
   private getMockSlots(professionalId: string, date: string, durationMinutes: number): Observable<string[]> {

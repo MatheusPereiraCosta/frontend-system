@@ -4,7 +4,7 @@ export interface BusinessInfo {
   slug: string;
   tagline: string;
   description: string;
-  category: 'barbearia' | 'salao' | 'estetica' | 'outro';
+  category: string;
   phone: string;
   whatsapp: string;
   address: {
@@ -19,4 +19,25 @@ export interface BusinessInfo {
   bannerUrl: string;
   rating: number;
   totalReviews: number;
+}
+
+/** Resultado público da busca (sem WhatsApp nem endereço completo). */
+export interface BusinessSummary {
+  name: string;
+  slug: string;
+  tagline: string;
+  category: string;
+  city: string;
+  state: string;
+  neighborhood: string;
+  logoUrl: string;
+  rating: number;
+  totalReviews: number;
+}
+
+export interface Page<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
 }

@@ -97,24 +97,16 @@ interface NavItem {
         </a>
       </div>
 
-      <!-- Public Booking Link & Footer -->
-      <div class="p-4 border-t border-slate-800 bg-slate-950/30 space-y-3">
+      <!-- Public Booking Link -->
+      <div *ngIf="business().slug" class="p-4 border-t border-slate-800 bg-slate-950/30">
         <a
-          routerLink="/agendar"
+          [routerLink]="['/b', business().slug]"
           target="_blank"
           class="flex items-center justify-center gap-2 w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-900/30 transition-all text-center"
         >
           <i class="pi pi-external-link text-xs"></i>
           <span>Ver Página Pública</span>
         </a>
-
-        <div class="flex items-center justify-between text-xs text-slate-400 pt-1 px-1">
-          <span>Modo Demonstração</span>
-          <span class="inline-flex items-center gap-1 text-emerald-400 font-medium">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            Online
-          </span>
-        </div>
       </div>
     </aside>
   `
@@ -163,6 +155,11 @@ export class SidebarComponent {
   ];
 
   public secondaryNavItems: NavItem[] = [
+    {
+      label: 'Meu Estabelecimento',
+      icon: 'pi-building',
+      route: '/admin/establishment'
+    },
     {
       label: 'Serviços & Preços',
       icon: 'pi-tag',

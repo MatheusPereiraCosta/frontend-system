@@ -8,6 +8,8 @@ import { AppointmentService } from './appointment.service';
 import { CustomerService } from './customer.service';
 import { ServiceCatalogService } from './service-catalog.service';
 import { getTodayDateString } from './mock/mock-data';
+import { fallbackTo } from './mock/mock-fallback';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -17,16 +19,17 @@ export class DashboardService {
   private appointmentService = inject(AppointmentService);
   private customerService = inject(CustomerService);
   private serviceService = inject(ServiceCatalogService);
+  private auth = inject(AuthService);
   private apiUrl = environment.apiUrl;
 
   getDashboardStats(): Observable<DashboardStats> {
-    const establishmentId = environment.defaultEstablishmentId;
+    const establishmentId = this.auth.establishmentId() ?? '';
 
     return this.http.get<DashboardStats>(`${this.apiUrl}/establishments/${establishmentId}/dashboard`).pipe(
-      catchError(err => {
-        console.warn('Backend indisponível para DashboardStats, usando cálculo baseado em memória/mock:', err?.message || err);
+      catchError(fallbackTo(() => {
+        console.warn('Backend indisponível para DashboardStats, usando cálculo baseado em memória/mock');
         return of(this.calculateLocalStats());
-      })
+      }))
     );
   }
 

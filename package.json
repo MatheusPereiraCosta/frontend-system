@@ -22,7 +22,7 @@
     "@primeng/themes": "^19.1.4",
     "apexcharts": "^8.8.1",
     "autoprefixer": "^10.6.2",
-    "ng-apexcharts": "^1.11.0",
+    "ng-apexcharts": "~1.15.0",
     "postcss": "^8.5.32",
     "primeicons": "^7.0.0",
     "primeng": "^19.1.4",

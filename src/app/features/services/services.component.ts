@@ -124,7 +124,7 @@ import { DurationPipe } from '../../shared/pipes/duration.pipe';
             <input
               type="text"
               formControlName="name"
-              placeholder="Ex: Corte Degrade Navalhado"
+              placeholder="Ex: Consulta, Corte de cabelo, Banho e tosa"
               class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             />
           </div>
@@ -134,7 +134,7 @@ import { DurationPipe } from '../../shared/pipes/duration.pipe';
             <input
               type="text"
               formControlName="category"
-              placeholder="Ex: Cabelo, Barba, Estética, Sobrancelha"
+              placeholder="Ex: Atendimento, Estética, Exames"
               class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             />
           </div>
@@ -263,7 +263,7 @@ export class ServicesComponent implements OnInit {
       this.editingId = null;
       this.serviceForm.reset({
         name: '',
-        category: 'Cabelo',
+        category: '',
         price: 60,
         durationMinutes: 45,
         description: '',

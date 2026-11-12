@@ -123,23 +123,20 @@ export type DonutChartOptions = {
           <p class="text-xs text-slate-400 mt-1">Horários marcados</p>
         </div>
 
-        <!-- Taxa de Ocupação -->
+        <!-- Taxa de Cancelamento -->
         <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs hover:shadow-md transition-shadow">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Taxa de Ocupação</span>
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Taxa de Cancelamento</span>
             <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
               <i class="pi pi-percentage text-lg"></i>
             </div>
           </div>
           <div class="mt-4 flex items-baseline justify-between">
             <h3 class="text-2xl font-extrabold text-slate-900">
-              {{ stats?.occupancyRate || 84 }}%
+              {{ stats?.cancellationRate || 0 }}%
             </h3>
-            <span class="text-xs font-semibold text-purple-600 flex items-center gap-0.5">
-              Ótima
-            </span>
           </div>
-          <p class="text-xs text-slate-400 mt-1">Capacidade preenchida</p>
+          <p class="text-xs text-slate-400 mt-1">Agendamentos cancelados no mês</p>
         </div>
 
         <!-- Faturamento Mensal -->
@@ -369,7 +366,10 @@ export class DashboardComponent implements OnInit {
       this.initDonutChart(stats);
     });
 
-    this.todayAppointments = this.appointmentService.todayAppointments();
+    // Sem data, a API devolve os agendamentos de hoje
+    this.appointmentService.getAppointments().subscribe((list: Appointment[]) => {
+      this.todayAppointments = list;
+    });
   }
 
   changeStatus(id: string, status: AppointmentStatus): void {

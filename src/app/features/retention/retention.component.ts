@@ -71,11 +71,9 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
         <div class="divide-y divide-slate-100">
           <div *ngFor="let customer of inactiveList" class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors">
             <div class="flex items-start sm:items-center gap-4">
-              <img
-                [src]="customer.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'"
-                [alt]="customer.name"
-                class="w-12 h-12 rounded-2xl object-cover border border-slate-200"
-              />
+              <div class="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-base font-bold">
+                {{ customer.name.charAt(0).toUpperCase() }}
+              </div>
               <div>
                 <div class="flex items-center gap-2">
                   <h3 class="font-bold text-slate-900 text-sm sm:text-base">{{ customer.name }}</h3>
@@ -131,7 +129,7 @@ import { PhonePipe } from '../../shared/pipes/phone.pipe';
               class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             >
               <option value="saudade">Sentimos sua falta (Amigável & Convite)</option>
-              <option value="desconto">Cupom Especial de Retorno (10% OFF)</option>
+              <option value="desconto">Condição Especial de Retorno</option>
               <option value="novidade">Novos Tratamentos e Horários Disponíveis</option>
             </select>
           </div>
@@ -204,13 +202,14 @@ export class RetentionComponent implements OnInit {
     if (!this.selectedCustomer) return;
     const biz = this.businessService.business();
     const firstName = this.selectedCustomer.name.split(' ')[0];
+    const link = `${window.location.origin}/b/${biz.slug}`;
 
     if (this.selectedTemplateType === 'saudade') {
-      this.customMessage = `Olá ${firstName}! Tudo bem? 😊\n\nAqui é da ${biz.name}. Notamos que faz um tempinho desde a sua última visita e gostaríamos de saber como você está!\n\nQue tal garantir um horário especial esta semana para dar aquele trato no visual?\n\nAgende online direto pelo link: https://agendapro.com/${biz.slug}\n\nTe esperamos! 💈✂️`;
+      this.customMessage = `Olá ${firstName}! Tudo bem? 😊\n\nAqui é da ${biz.name}. Notamos que faz um tempinho desde a sua última visita e gostaríamos de saber como você está!\n\nQue tal garantir um horário esta semana?\n\nAgende online direto pelo link: ${link}\n\nTe esperamos!`;
     } else if (this.selectedTemplateType === 'desconto') {
-      this.customMessage = `Olá ${firstName}! Tudo bem? 🎁\n\nA ${biz.name} preparou um presente exclusivo para o seu retorno: 10% OFF em qualquer serviço agendado para esta semana!\n\nUse o cupom RETORNO10 ou agende direto com a gente.\n\nClique no link e escolha seu melhor horário: https://agendapro.com/${biz.slug}`;
+      this.customMessage = `Olá ${firstName}! Tudo bem? 🎁\n\nA ${biz.name} preparou uma condição especial para o seu retorno. Fale com a gente para saber os detalhes!\n\nEscolha o seu melhor horário pelo link: ${link}`;
     } else {
-      this.customMessage = `Olá ${firstName}! 🌟\n\nTemos novidades na ${biz.name}! Ampliamos nossa equipe e adicionamos novos horários de atendimento para sua comodidade.\n\nGaranta seu atendimento sem filas no link: https://agendapro.com/${biz.slug}\n\nUm abraço da equipe!`;
+      this.customMessage = `Olá ${firstName}! 🌟\n\nTemos novidades na ${biz.name}! Adicionamos novos horários de atendimento para sua comodidade.\n\nGaranta o seu horário pelo link: ${link}\n\nUm abraço da equipe!`;
     }
   }
 
